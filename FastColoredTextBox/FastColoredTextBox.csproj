@@ -49,7 +49,7 @@
   <ItemGroup>
     <Compile Include="AutocompleteItem.cs" />
     <Compile Include="AutocompleteMenu.cs">
-      <SubType>Component</SubType>
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Bookmarks.cs" />
     <Compile Include="Char.cs" />
@@ -62,7 +62,7 @@
     <Compile Include="GoToForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="GoToForm.designer.cs">
+    <Compile Include="GoToForm.Designer.cs">
       <DependentUpon>GoToForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Hints.cs" />

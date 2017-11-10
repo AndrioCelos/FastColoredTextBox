@@ -26,6 +26,8 @@ namespace FastColoredTextBoxNS
         protected readonly Dictionary<string, SyntaxDescriptor> descByXMLfileNames =
             new Dictionary<string, SyntaxDescriptor>();
 
+        protected readonly List<Style> resilientStyles = new List<Style>(5);
+
         protected Regex CSharpAttributeRegex,
                       CSharpClassNameRegex;
 
@@ -96,7 +98,8 @@ namespace FastColoredTextBoxNS
 
         protected Regex SQLCommentRegex1,
                       SQLCommentRegex2,
-                      SQLCommentRegex3;
+                      SQLCommentRegex3, 
+                      SQLCommentRegex4;
 
         protected Regex SQLFunctionsRegex;
         protected Regex SQLKeywordsRegex;
@@ -111,6 +114,8 @@ namespace FastColoredTextBoxNS
         protected Regex VBNumberRegex;
         protected Regex VBStringRegex;
 
+        protected FastColoredTextBox currentTb;
+
         public static RegexOptions RegexCompiledOption
         {
             get
@@ -120,6 +125,10 @@ namespace FastColoredTextBoxNS
                 else
                     return RegexOptions.None;
             }
+        }
+
+        public SyntaxHighlighter(FastColoredTextBox currentTb) {
+            this.currentTb = currentTb;
         }
 
         #region IDisposable Members
@@ -354,6 +363,36 @@ namespace FastColoredTextBoxNS
                 }
         }
 
+        /// <summary>
+        /// Uses the given <paramref name="doc"/> to parse a XML description and adds it as syntax descriptor. 
+        /// The syntax descriptor is used for highlighting when 
+        /// <list type="bullet">
+        ///     <item>Language property of FCTB is set to <see cref="Language.Custom"/></item>
+        ///     <item>DescriptionFile property of FCTB has the same value as the method parameter <paramref name="descriptionFileName"/></item>
+        /// </list>
+        /// </summary>
+        /// <param name="descriptionFileName">Name of the description file</param>
+        /// <param name="doc">XmlDocument to parse</param>
+        public virtual void AddXmlDescription(string descriptionFileName, XmlDocument doc)
+        {
+            SyntaxDescriptor desc = ParseXmlDescription(doc);
+            descByXMLfileNames[descriptionFileName] = desc;
+        }
+
+        /// <summary>
+        /// Adds the given <paramref name="style"/> as resilient style. A resilient style is additionally available when highlighting is 
+        /// based on a syntax descriptor that has been derived from a XML description file. In the run of the highlighting routine 
+        /// the styles used by the FCTB are always dropped and replaced with the (initial) ones from the syntax descriptor. Resilient styles are 
+        /// added afterwards and can be used anyway. 
+        /// </summary>
+        /// <param name="style">Style to add</param>
+        public virtual void AddResilientStyle(Style style)
+        {
+            if (resilientStyles.Contains(style)) return;
+            currentTb.CheckStylesBufferSize(); // Prevent buffer overflow
+            resilientStyles.Add(style);
+        }
+
         public static SyntaxDescriptor ParseXmlDescription(XmlDocument doc)
         {
             var desc = new SyntaxDescriptor();
@@ -482,6 +521,10 @@ namespace FastColoredTextBoxNS
             range.tb.ClearStylesBuffer();
             for (int i = 0; i < desc.styles.Count; i++)
                 range.tb.Styles[i] = desc.styles[i];
+            // add resilient styles
+            int l = desc.styles.Count;
+            for (int i = 0; i < resilientStyles.Count; i++)
+                range.tb.Styles[l + i] = resilientStyles[i];
             //brackets
             char[] oldBrackets = RememberBrackets(range.tb);
             range.tb.LeftBracket = desc.leftBracket;
@@ -932,7 +975,7 @@ namespace FastColoredTextBoxNS
                 if (tagName[0] != '/')
                 {
                     // ...push into stack
-                    var tag = new XmlFoldingTag {Name = tagName, id = id++, startLine = r.Start.iLine};
+                    var tag = new XmlFoldingTag { Name = tagName, id = id++, startLine = r.Start.iLine };
                     stack.Push(tag);
                     // if this line has no markers - set marker
                     if (string.IsNullOrEmpty(fctb[iLine].FoldingStartMarker))
@@ -963,12 +1006,12 @@ namespace FastColoredTextBoxNS
         }
 
         class XmlFoldingTag
-		{
-			public string Name;
-			public int id;
-			public int startLine;
-			public string Marker { get { return Name + id; } }
-		}
+        {
+            public string Name;
+            public int id;
+            public int startLine;
+            public string Marker { get { return Name + id; } }
+        }
 
         protected void InitSQLRegex()
         {
@@ -976,8 +1019,8 @@ namespace FastColoredTextBoxNS
             SQLNumberRegex = new Regex(@"\b\d+[\.]?\d*([eE]\-?\d+)?\b", RegexCompiledOption);
             SQLCommentRegex1 = new Regex(@"--.*$", RegexOptions.Multiline | RegexCompiledOption);
             SQLCommentRegex2 = new Regex(@"(/\*.*?\*/)|(/\*.*)", RegexOptions.Singleline | RegexCompiledOption);
-            SQLCommentRegex3 = new Regex(@"(/\*.*?\*/)|(.*\*/)",
-                                         RegexOptions.Singleline | RegexOptions.RightToLeft | RegexCompiledOption);
+            SQLCommentRegex3 = new Regex(@"(/\*.*?\*/)|(.*\*/)", RegexOptions.Singleline | RegexOptions.RightToLeft | RegexCompiledOption);
+            SQLCommentRegex4 = new Regex(@"#.*$", RegexOptions.Multiline | RegexCompiledOption);
             SQLVarRegex = new Regex(@"@[a-zA-Z_\d]*\b", RegexCompiledOption);
             SQLStatementsRegex = new Regex(@"\b(ALTER APPLICATION ROLE|ALTER ASSEMBLY|ALTER ASYMMETRIC KEY|ALTER AUTHORIZATION|ALTER BROKER PRIORITY|ALTER CERTIFICATE|ALTER CREDENTIAL|ALTER CRYPTOGRAPHIC PROVIDER|ALTER DATABASE|ALTER DATABASE AUDIT SPECIFICATION|ALTER DATABASE ENCRYPTION KEY|ALTER ENDPOINT|ALTER EVENT SESSION|ALTER FULLTEXT CATALOG|ALTER FULLTEXT INDEX|ALTER FULLTEXT STOPLIST|ALTER FUNCTION|ALTER INDEX|ALTER LOGIN|ALTER MASTER KEY|ALTER MESSAGE TYPE|ALTER PARTITION FUNCTION|ALTER PARTITION SCHEME|ALTER PROCEDURE|ALTER QUEUE|ALTER REMOTE SERVICE BINDING|ALTER RESOURCE GOVERNOR|ALTER RESOURCE POOL|ALTER ROLE|ALTER ROUTE|ALTER SCHEMA|ALTER SERVER AUDIT|ALTER SERVER AUDIT SPECIFICATION|ALTER SERVICE|ALTER SERVICE MASTER KEY|ALTER SYMMETRIC KEY|ALTER TABLE|ALTER TRIGGER|ALTER USER|ALTER VIEW|ALTER WORKLOAD GROUP|ALTER XML SCHEMA COLLECTION|BULK INSERT|CREATE AGGREGATE|CREATE APPLICATION ROLE|CREATE ASSEMBLY|CREATE ASYMMETRIC KEY|CREATE BROKER PRIORITY|CREATE CERTIFICATE|CREATE CONTRACT|CREATE CREDENTIAL|CREATE CRYPTOGRAPHIC PROVIDER|CREATE DATABASE|CREATE DATABASE AUDIT SPECIFICATION|CREATE DATABASE ENCRYPTION KEY|CREATE DEFAULT|CREATE ENDPOINT|CREATE EVENT NOTIFICATION|CREATE EVENT SESSION|CREATE FULLTEXT CATALOG|CREATE FULLTEXT INDEX|CREATE FULLTEXT STOPLIST|CREATE FUNCTION|CREATE INDEX|CREATE LOGIN|CREATE MASTER KEY|CREATE MESSAGE TYPE|CREATE PARTITION FUNCTION|CREATE PARTITION SCHEME|CREATE PROCEDURE|CREATE QUEUE|CREATE REMOTE SERVICE BINDING|CREATE RESOURCE POOL|CREATE ROLE|CREATE ROUTE|CREATE RULE|CREATE SCHEMA|CREATE SERVER AUDIT|CREATE SERVER AUDIT SPECIFICATION|CREATE SERVICE|CREATE SPATIAL INDEX|CREATE STATISTICS|CREATE SYMMETRIC KEY|CREATE SYNONYM|CREATE TABLE|CREATE TRIGGER|CREATE TYPE|CREATE USER|CREATE VIEW|CREATE WORKLOAD GROUP|CREATE XML INDEX|CREATE XML SCHEMA COLLECTION|DELETE|DISABLE TRIGGER|DROP AGGREGATE|DROP APPLICATION ROLE|DROP ASSEMBLY|DROP ASYMMETRIC KEY|DROP BROKER PRIORITY|DROP CERTIFICATE|DROP CONTRACT|DROP CREDENTIAL|DROP CRYPTOGRAPHIC PROVIDER|DROP DATABASE|DROP DATABASE AUDIT SPECIFICATION|DROP DATABASE ENCRYPTION KEY|DROP DEFAULT|DROP ENDPOINT|DROP EVENT NOTIFICATION|DROP EVENT SESSION|DROP FULLTEXT CATALOG|DROP FULLTEXT INDEX|DROP FULLTEXT STOPLIST|DROP FUNCTION|DROP INDEX|DROP LOGIN|DROP MASTER KEY|DROP MESSAGE TYPE|DROP PARTITION FUNCTION|DROP PARTITION SCHEME|DROP PROCEDURE|DROP QUEUE|DROP REMOTE SERVICE BINDING|DROP RESOURCE POOL|DROP ROLE|DROP ROUTE|DROP RULE|DROP SCHEMA|DROP SERVER AUDIT|DROP SERVER AUDIT SPECIFICATION|DROP SERVICE|DROP SIGNATURE|DROP STATISTICS|DROP SYMMETRIC KEY|DROP SYNONYM|DROP TABLE|DROP TRIGGER|DROP TYPE|DROP USER|DROP VIEW|DROP WORKLOAD GROUP|DROP XML SCHEMA COLLECTION|ENABLE TRIGGER|EXEC|EXECUTE|REPLACE|FROM|INSERT|MERGE|OPTION|OUTPUT|SELECT|TOP|TRUNCATE TABLE|UPDATE|UPDATE STATISTICS|WHERE|WITH|INTO|IN|SET)\b", RegexOptions.IgnoreCase | RegexCompiledOption);
             SQLKeywordsRegex = new Regex(@"\b(ADD|ALL|AND|ANY|AS|ASC|AUTHORIZATION|BACKUP|BEGIN|BETWEEN|BREAK|BROWSE|BY|CASCADE|CHECK|CHECKPOINT|CLOSE|CLUSTERED|COLLATE|COLUMN|COMMIT|COMPUTE|CONSTRAINT|CONTAINS|CONTINUE|CROSS|CURRENT|CURRENT_DATE|CURRENT_TIME|CURSOR|DATABASE|DBCC|DEALLOCATE|DECLARE|DEFAULT|DENY|DESC|DISK|DISTINCT|DISTRIBUTED|DOUBLE|DUMP|ELSE|END|ERRLVL|ESCAPE|EXCEPT|EXISTS|EXIT|EXTERNAL|FETCH|FILE|FILLFACTOR|FOR|FOREIGN|FREETEXT|FULL|FUNCTION|GOTO|GRANT|GROUP|HAVING|HOLDLOCK|IDENTITY|IDENTITY_INSERT|IDENTITYCOL|IF|INDEX|INNER|INTERSECT|IS|JOIN|KEY|KILL|LIKE|LINENO|LOAD|NATIONAL|NOCHECK|NONCLUSTERED|NOT|NULL|OF|OFF|OFFSETS|ON|OPEN|OR|ORDER|OUTER|OVER|PERCENT|PIVOT|PLAN|PRECISION|PRIMARY|PRINT|PROC|PROCEDURE|PUBLIC|RAISERROR|READ|READTEXT|RECONFIGURE|REFERENCES|REPLICATION|RESTORE|RESTRICT|RETURN|REVERT|REVOKE|ROLLBACK|ROWCOUNT|ROWGUIDCOL|RULE|SAVE|SCHEMA|SECURITYAUDIT|SHUTDOWN|SOME|STATISTICS|TABLE|TABLESAMPLE|TEXTSIZE|THEN|TO|TRAN|TRANSACTION|TRIGGER|TSEQUAL|UNION|UNIQUE|UNPIVOT|UPDATETEXT|USE|USER|VALUES|VARYING|VIEW|WAITFOR|WHEN|WHILE|WRITETEXT)\b", RegexOptions.IgnoreCase | RegexCompiledOption);
@@ -1011,6 +1054,7 @@ namespace FastColoredTextBoxNS
             range.SetStyle(CommentStyle, SQLCommentRegex1);
             range.SetStyle(CommentStyle, SQLCommentRegex2);
             range.SetStyle(CommentStyle, SQLCommentRegex3);
+            range.SetStyle(CommentStyle, SQLCommentRegex4);
             //string highlighting
             range.SetStyle(StringStyle, SQLStringRegex);
             //number highlighting
