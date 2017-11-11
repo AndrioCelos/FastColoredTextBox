@@ -68,8 +68,10 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Deployment" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
     <Reference Include="TabStrip">
       <HintPath>..\Tester\bin\Debug\TabStrip.dll</HintPath>
     </Reference>
@@ -190,6 +192,12 @@
     <Compile Include="SplitSample.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="StyleGroupSample.Designer.vb">
+      <DependentUpon>StyleGroupSample.vb</DependentUpon>
+    </Compile>
+    <Compile Include="StyleGroupSample.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="SyntaxHighlightingByXmlDescription.vb">
       <SubType>Form</SubType>
     </Compile>
@@ -241,6 +249,9 @@
       <LastGenOutput>Resources.Designer.vb</LastGenOutput>
       <CustomToolNamespace>My.Resources</CustomToolNamespace>
       <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="StyleGroupSample.resx">
+      <DependentUpon>StyleGroupSample.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="TooltipSample.resx">
       <DependentUpon>TooltipSample.vb</DependentUpon>

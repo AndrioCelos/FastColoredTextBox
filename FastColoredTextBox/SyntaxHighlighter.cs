@@ -519,12 +519,13 @@ namespace FastColoredTextBoxNS
         {
             //set style order
             range.tb.ClearStylesBuffer();
-            for (int i = 0; i < desc.styles.Count; i++)
-                range.tb.Styles[i] = desc.styles[i];
-            // add resilient styles
-            int l = desc.styles.Count;
-            for (int i = 0; i < resilientStyles.Count; i++)
-                range.tb.Styles[l + i] = resilientStyles[i];
+			foreach (var style in desc.styles) {
+				range.tb.GetOrSetStyleIndex(style);
+			}
+			// add resilient styles
+			foreach (var style in resilientStyles) {
+				range.tb.GetOrSetStyleIndex(style);
+			}
             //brackets
             char[] oldBrackets = RememberBrackets(range.tb);
             range.tb.LeftBracket = desc.leftBracket;

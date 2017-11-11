@@ -733,49 +733,46 @@ namespace FastColoredTextBoxNS
         /// </summary>
         public void SetStyle(Style style)
         {
-            //search code for style
-            int code = tb.GetOrSetStyleLayerIndex(style);
-            //set code to chars
-            SetStyle(ToStyleIndex(code));
-            //
-            tb.Invalidate();
-        }
+			var styleIndex = tb.GetOrSetStyleIndex(style, out var mask);
+			this.SetStyle(styleIndex, mask);
+			tb.Invalidate();
+		}
 
-        /// <summary>
-        /// Set style for given regex pattern
-        /// </summary>
-        public void SetStyle(Style style, string regexPattern)
+		/// <summary>
+		/// Set style for given regex pattern
+		/// </summary>
+		public void SetStyle(Style style, string regexPattern)
+			=> this.SetStyle(style, regexPattern, 0);
+
+		/// <summary>
+		/// Set style for given regex
+		/// </summary>
+		public void SetStyle(Style style, Regex regex)
         {
-            //search code for style
-            StyleIndex layer = ToStyleIndex(tb.GetOrSetStyleLayerIndex(style));
-            SetStyle(layer, regexPattern, RegexOptions.None);
-        }
+			foreach (var range in GetRanges(regex))
+				range.SetStyle(style);
+			//
+			tb.Invalidate();
+		}
 
-        /// <summary>
-        /// Set style for given regex
-        /// </summary>
-        public void SetStyle(Style style, Regex regex)
+		/// <summary>
+		/// Set style for given regex pattern
+		/// </summary>
+		public void SetStyle(Style style, string regexPattern, RegexOptions options)
         {
-            //search code for style
-            StyleIndex layer = ToStyleIndex(tb.GetOrSetStyleLayerIndex(style));
-            SetStyle(layer, regex);
-        }
+			if (Math.Abs(Start.iLine - End.iLine) > 1000)
+				options |= SyntaxHighlighter.RegexCompiledOption;
+			//
+			foreach (var range in GetRanges(regexPattern, options))
+				range.SetStyle(style);
+			//
+			tb.Invalidate();
+		}
 
-
-        /// <summary>
-        /// Set style for given regex pattern
-        /// </summary>
-        public void SetStyle(Style style, string regexPattern, RegexOptions options)
-        {
-            //search code for style
-            StyleIndex layer = ToStyleIndex(tb.GetOrSetStyleLayerIndex(style));
-            SetStyle(layer, regexPattern, options);
-        }
-
-        /// <summary>
-        /// Set style for given regex pattern
-        /// </summary>
-        public void SetStyle(StyleIndex styleLayer, string regexPattern, RegexOptions options)
+		/// <summary>
+		/// Set style for given regex pattern
+		/// </summary>
+		public void SetStyle(StyleIndex styleLayer, string regexPattern, RegexOptions options)
         {
             if (Math.Abs(Start.iLine - End.iLine) > 1000)
                 options |= SyntaxHighlighter.RegexCompiledOption;
@@ -797,10 +794,17 @@ namespace FastColoredTextBoxNS
             tb.Invalidate();
         }
 
-        /// <summary>
-        /// Appends style to chars of range
-        /// </summary>
-        public void SetStyle(StyleIndex styleIndex)
+		/// <summary>
+		/// Appends style to chars of range
+		/// </summary>
+		public void SetStyle(StyleIndex styleIndex)
+			=> this.SetStyle(styleIndex, ~(StyleIndex) 0);
+		/// <summary>
+		/// Appends style to chars of range
+		/// </summary>
+		/// <param name="styleIndex">The style flags to add.</param>
+		/// <param name="mask">A mask used to clear conflicting styles.</param>
+		public void SetStyle(StyleIndex styleIndex, StyleIndex mask)
         {
             //set code to chars
             int fromLine = Math.Min(End.iLine, Start.iLine);
@@ -816,6 +820,7 @@ namespace FastColoredTextBoxNS
                 for (int x = fromX; x <= toX; x++)
                 {
                     Char c = tb[y][x];
+					c.style &= mask;
                     c.style |= styleIndex;
                     tb[y][x] = c;
                 }
@@ -1211,7 +1216,8 @@ namespace FastColoredTextBoxNS
         /// <returns>Range of found fragment</returns>
         public Range GetFragment(Style style, bool allowLineBreaks)
         {
-            var mask = tb.GetStyleIndexMask(new Style[] { style });
+            var styleIndex = tb.GetOrSetStyleIndex(style, out var mask);
+			mask = ~mask;
             //
             Range r = new Range(tb);
             r.Start = Start;
@@ -1221,7 +1227,7 @@ namespace FastColoredTextBoxNS
                 if (!allowLineBreaks && r.CharAfterStart == '\n')
                     break;
                 if (r.Start.iChar < tb.GetLineLength(r.Start.iLine))
-                    if ((tb[r.Start].style & mask) == 0)
+                    if ((tb[r.Start].style & mask) != styleIndex)
                     {
                         r.GoRightThroughFolded();
                         break;
@@ -1236,7 +1242,7 @@ namespace FastColoredTextBoxNS
                 if (!allowLineBreaks && r.CharAfterStart == '\n')
                     break;
                 if (r.Start.iChar < tb.GetLineLength(r.Start.iLine))
-                    if ((tb[r.Start].style & mask) == 0)
+                    if ((tb[r.Start].style & mask) != styleIndex)
                         break;
             } while (r.GoRightThroughFolded());
             Place endFragment = r.Start;
@@ -1448,16 +1454,16 @@ namespace FastColoredTextBoxNS
                 if (tb.ReadOnly) return true;
 
                 ReadOnlyStyle readonlyStyle = null;
-                foreach (var style in tb.Styles)
-                    if (style is ReadOnlyStyle)
+                foreach (var styleGroup in tb.Styles)
+                    if (styleGroup.Styles[0] is ReadOnlyStyle)
                     {
-                        readonlyStyle = (ReadOnlyStyle)style;
+                        readonlyStyle = (ReadOnlyStyle)styleGroup.Styles[0];
                         break;
                     }
 
                 if (readonlyStyle != null)
                 {
-                    var si = ToStyleIndex(tb.GetStyleIndex(readonlyStyle));
+                    var si = tb.GetStyleIndex(readonlyStyle);
 
                     if (IsEmpty)
                     {
@@ -1499,10 +1505,10 @@ namespace FastColoredTextBoxNS
             {
                 //find exists ReadOnlyStyle of style buffer
                 ReadOnlyStyle readonlyStyle = null;
-                foreach (var style in tb.Styles)
-                    if (style is ReadOnlyStyle)
+                foreach (var styleGroup in tb.Styles)
+                    if (styleGroup.Styles[0] is ReadOnlyStyle)
                     {
-                        readonlyStyle = (ReadOnlyStyle)style;
+                        readonlyStyle = (ReadOnlyStyle)styleGroup.Styles[0];
                         break;
                     }
 

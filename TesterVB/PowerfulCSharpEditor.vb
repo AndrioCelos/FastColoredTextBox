@@ -1059,8 +1059,8 @@ Namespace TesterVB
                     Me.lastNavigatedDateTime = tb(tb.Selection.Start.iLine).LastVisit
                 End If
             End If
-            tb.VisibleRange.ClearStyle(New Style() {tb.Styles(0)})
-            If tb.Selection.IsEmpty Then
+			tb.VisibleRange.ClearStyle(StyleIndex.Style0)
+			If tb.Selection.IsEmpty Then
                 Dim fragment As Range = tb.Selection.GetFragment("\w")
                 Dim text As String = fragment.Text
                 If text.Length <> 0 Then
@@ -1069,8 +1069,8 @@ Namespace TesterVB
                         Dim array As Range() = ranges
                         For i As Integer = 0 To array.Length - 1
                             Dim r As Range = array(i)
-                            r.SetStyle(tb.Styles(0))
-                        Next
+							r.SetStyle(StyleIndex.Style0)
+						Next
                     End If
                 End If
             End If

@@ -797,19 +797,25 @@ namespace FastColoredTextBoxNS
             }
         }
 
-        /// <summary>
-        /// Styles
-        /// </summary>
-        [Browsable(false)]
-        public Style[] Styles
+#if (Styles32)
+		public const int MaxStyles = 32;
+#else
+		public const int MaxStyles = 16;
+#endif
+
+		/// <summary>
+		/// Styles
+		/// </summary>
+		[Browsable(false)]
+        public List<StyleGroup> Styles
         {
             get { return lines.Styles; }
         }
 
-        /// <summary>
-        /// Hotkeys. Do not use this property in your code, use HotkeysMapping property.
-        /// </summary>
-        [Description("Here you can change hotkeys for FastColoredTextBox.")]
+		/// <summary>
+		/// Hotkeys. Do not use this property in your code, use HotkeysMapping property.
+		/// </summary>
+		[Description("Here you can change hotkeys for FastColoredTextBox.")]
         [Editor(typeof(HotkeysEditor), typeof(UITypeEditor))]
         [DefaultValue("Tab=IndentIncrease, Escape=ClearHints, PgUp=GoPageUp, PgDn=GoPageDown, End=GoEnd, Home=GoHome, Left=GoLeft, Up=GoUp, Right=GoRight, Down=GoDown, Ins=ReplaceMode, Del=DeleteCharRight, F3=FindNext, Shift+Tab=IndentDecrease, Shift+PgUp=GoPageUpWithSelection, Shift+PgDn=GoPageDownWithSelection, Shift+End=GoEndWithSelection, Shift+Home=GoHomeWithSelection, Shift+Left=GoLeftWithSelection, Shift+Up=GoUpWithSelection, Shift+Right=GoRightWithSelection, Shift+Down=GoDownWithSelection, Shift+Ins=Paste, Shift+Del=Cut, Ctrl+Back=ClearWordLeft, Ctrl+Space=AutocompleteMenu, Ctrl+End=GoLastLine, Ctrl+Home=GoFirstLine, Ctrl+Left=GoWordLeft, Ctrl+Up=ScrollUp, Ctrl+Right=GoWordRight, Ctrl+Down=ScrollDown, Ctrl+Ins=Copy, Ctrl+Del=ClearWordRight, Ctrl+0=ZoomNormal, Ctrl+A=SelectAll, Ctrl+B=BookmarkLine, Ctrl+C=Copy, Ctrl+E=MacroExecute, Ctrl+F=FindDialog, Ctrl+G=GoToDialog, Ctrl+H=ReplaceDialog, Ctrl+I=AutoIndentChars, Ctrl+M=MacroRecord, Ctrl+N=GoNextBookmark, Ctrl+R=Redo, Ctrl+U=UpperCase, Ctrl+V=Paste, Ctrl+X=Cut, Ctrl+Z=Undo, Ctrl+Add=ZoomIn, Ctrl+Subtract=ZoomOut, Ctrl+OemMinus=NavigateBackward, Ctrl+Shift+End=GoLastLineWithSelection, Ctrl+Shift+Home=GoFirstLineWithSelection, Ctrl+Shift+Left=GoWordLeftWithSelection, Ctrl+Shift+Right=GoWordRightWithSelection, Ctrl+Shift+B=UnbookmarkLine, Ctrl+Shift+C=CommentSelected, Ctrl+Shift+N=GoPrevBookmark, Ctrl+Shift+U=LowerCase, Ctrl+Shift+OemMinus=NavigateForward, Alt+Back=Undo, Alt+Up=MoveSelectedLinesUp, Alt+Down=MoveSelectedLinesDown, Alt+F=FindChar, Alt+Shift+Left=GoLeft_ColumnSelectionMode, Alt+Shift+Up=GoUp_ColumnSelectionMode, Alt+Shift+Right=GoRight_ColumnSelectionMode, Alt+Shift+Down=GoDown_ColumnSelectionMode")]
         public string Hotkeys { 
@@ -2004,32 +2010,52 @@ namespace FastColoredTextBoxNS
         [Description("Occurs when custom wordwrap is needed.")]
         public event EventHandler<WordWrapNeededEventArgs> WordWrapNeeded;
 
+		public List<Style> GetStylesOfStyleIndex(StyleIndex styleIndex) {
+			var result = new List<Style>();
 
-        /// <summary>
-        /// Returns list of styles of given place
-        /// </summary>
-        public List<Style> GetStylesOfChar(Place place)
+			int bitIndex = 0;
+			for (int i = 0; i < Styles.Count; ++i) {
+				var mask = (StyleIndex) ((1 << Styles[i].Bits) - 1 << bitIndex);
+				if ((styleIndex & mask) != 0) {
+					result.Add(Styles[i].Styles[((uint) (styleIndex & mask) >> bitIndex) - 1]);
+				}
+			}
+			++bitIndex;
+
+			return result;
+		}
+
+		/// <summary>
+		/// Returns list of styles of given place
+		/// </summary>
+		public List<Style> GetStylesOfChar(Place place)
         {
             var result = new List<Style>();
             if (place.iLine < LinesCount && place.iChar < this[place.iLine].Count)
             {
-#if Styles32
-                var s = (uint) this[place].style;
-                for (int i = 0; i < 32; i++)
-                    if ((s & ((uint) 1) << i) != 0)
-                        result.Add(Styles[i]);
-#else
-                var s = (ushort)this[place].style;
-                for (int i = 0; i < 16; i++)
-                    if ((s & ((ushort) 1) << i) != 0)
-                        result.Add(Styles[i]);
-#endif
+				return this.GetStylesOfStyleIndex(this[place].style);
             }
 
             return result;
         }
 
-        protected virtual TextSource CreateTextSource()
+		public bool CharHasStyle(Place place, Style style)
+		{
+			if (place.iLine < LinesCount && place.iChar < this[place.iLine].Count)
+			{
+				return this.CharHasStyle(this[place], style);
+			}
+			return false;
+		}
+
+		public bool CharHasStyle(Char c, Style style)
+		{
+			var styleIndex = this.GetStyleIndex(style, out var mask);
+			if (styleIndex == 0) return false;
+			return (c.style & ~mask) == styleIndex;
+		}
+
+		protected virtual TextSource CreateTextSource()
         {
             return new TextSource(this);
         }
@@ -2350,35 +2376,35 @@ namespace FastColoredTextBoxNS
         /// <returns>Layer index of this style</returns>
         public int AddStyle(Style style)
         {
-            if (style == null) return -1;
+			return this.AddStyleGroup(new StyleGroup(new[] { style }));
+		}
 
-            int i = GetStyleIndex(style);
-            if (i >= 0)
-                return i;
+		public int AddStyleGroup(StyleGroup styleGroup) {
+			var index = CheckStylesBufferSize(styleGroup.Bits);
+			lines.Styles.Add(styleGroup);
+			return index;
+		}
 
-            i = CheckStylesBufferSize();
-            Styles[i] = style;
-            return i;
-        }
-
-        /// <summary>
-        /// Checks if the styles buffer has enough space to add one 
-        /// more element. If not, an exception is thrown. Otherwise, 
-        /// the index of a free slot is returned. 
-        /// </summary>
-        /// <returns>Index of free styles buffer slot</returns>
-        /// <exception cref="Exception">If maximum count of styles is exceeded</exception>
-        public int CheckStylesBufferSize() {
-            int i;
-            for (i = Styles.Length - 1; i >= 0; i--)
-                if (Styles[i] != null)
-                    break;
-
-            i++;
-            if (i >= Styles.Length)
-                throw new Exception("Maximum count of Styles is exceeded.");
-
-            return i;
+		/// <summary>
+		/// Checks if the styles buffer has enough space to add one 
+		/// more element. If not, an exception is thrown. Otherwise, 
+		/// the index of a free slot is returned. 
+		/// </summary>
+		/// <returns>Index of free styles buffer slot</returns>
+		/// <exception cref="InvalidOperationException">If maximum count of styles is exceeded</exception>
+		public int CheckStylesBufferSize() => this.CheckStylesBufferSize(1);
+		/// <summary>
+		/// Checks if the styles buffer has the specified number of
+		/// bits remaining. If not, an exception is thrown. Otherwise, 
+		/// the index of a free slot is returned. 
+		/// </summary>
+		/// <returns>Index of free styles buffer slot</returns>
+		/// <exception cref="InvalidOperationException">If maximum count of styles is exceeded</exception>
+		public int CheckStylesBufferSize(int bits) {
+			int bitsUsed = 0;
+			foreach (var styleGroup2 in Styles) bitsUsed += styleGroup2.Bits;
+			if (MaxStyles - bitsUsed < bits) throw new InvalidOperationException("Maximum count of Styles is exceeded.");
+			return bitsUsed;
         }
 
         /// <summary>
@@ -2675,8 +2701,7 @@ namespace FastColoredTextBoxNS
         /// </summary>
         public void ClearStylesBuffer()
         {
-            for (int i = 0; i < Styles.Length; i++)
-                Styles[i] = null;
+			Styles.Clear();
         }
 
         /// <summary>
@@ -2854,38 +2879,106 @@ namespace FastColoredTextBoxNS
         /// </summary>
         /// <param name="style"></param>
         /// <returns>Index of the style in Styles</returns>
-        public int GetStyleIndex(Style style)
+        public int GetStyleLayerIndex(Style style)
         {
-            return Array.IndexOf(Styles, style);
+			for (int i = 0; i < Styles.Count; ++i) {
+				if (Array.IndexOf(Styles[i].Styles, style) >= 0) return i;
+			}
+			return -1;
         }
 
-        /// <summary>
-        /// Returns StyleIndex mask of given styles
-        /// </summary>
-        /// <param name="styles"></param>
-        /// <returns>StyleIndex mask of given styles</returns>
-        public StyleIndex GetStyleIndexMask(Style[] styles)
-        {
-            StyleIndex mask = StyleIndex.None;
-            foreach (Style style in styles)
-            {
-                int i = GetStyleIndex(style);
-                if (i >= 0)
-                    mask |= Range.ToStyleIndex(i);
-            }
+		/// <summary>
+		/// Returns index of the style in Styles
+		/// -1 otherwise
+		/// </summary>
+		/// <param name="style"></param>
+		/// <returns>Index of the style in Styles</returns>
+		public StyleIndex GetStyleIndex(Style style) {
+			int bitIndex = 0;
+			for (int i = 0; i < Styles.Count; ++i) {
+				var j = Array.IndexOf(Styles[i].Styles, style);
+				if (j >= 0) {
+					return (StyleIndex) (j + 1 << bitIndex);
+				}
+				bitIndex += Styles[i].Bits;
+			}
 
-            return mask;
-        }
+			return 0;
+		}
 
-        internal int GetOrSetStyleLayerIndex(Style style)
+		/// <summary>
+		/// Returns index of the style in Styles
+		/// -1 otherwise
+		/// </summary>
+		/// <param name="style"></param>
+		/// <returns>Index of the style in Styles</returns>
+		public StyleIndex GetStyleIndex(Style style, out StyleIndex mask) {
+			int bitIndex = 0;
+			for (int i = 0; i < Styles.Count; ++i) {
+				var j = Array.IndexOf(Styles[i].Styles, style);
+				if (j >= 0) {
+					mask = ~(StyleIndex) ((1 << Styles[i].Bits) - 1 << bitIndex);
+					return (StyleIndex) (j + 1 << bitIndex);
+				}
+				bitIndex += Styles[i].Bits;
+			}
+
+			mask = ~(StyleIndex) 0;
+			return 0;
+		}
+
+		/// <summary>
+		/// Returns StyleIndex mask of given styles
+		/// </summary>
+		/// <param name="styles"></param>
+		/// <returns>StyleIndex mask of given styles</returns>
+		public StyleIndex GetStyleIndexMask(Style[] styles)
         {
-            int i = GetStyleIndex(style);
+			var mask = StyleIndex.None;
+
+			int bitIndex = 0;
+			for (int i = 0; i < Styles.Count; ++i) {
+				for (int j = 0; j < Styles[i].Styles.Length; ++j) {
+					if (Array.IndexOf(styles, Styles[i].Styles[j]) >= 0) {
+						mask |= (StyleIndex) (j + 1 << bitIndex);
+					}
+				}
+				bitIndex += Styles[i].Bits;
+			}
+
+			return mask;
+		}
+
+		internal int GetOrSetStyleLayerIndex(Style style)
+        {
+            int i = GetStyleLayerIndex(style);
             if (i < 0)
                 i = AddStyle(style);
             return i;
         }
 
-        public static SizeF GetCharSize(Font font, char c)
+		/// <summary>
+		/// Returns the <see cref="StyleIndex"/> flags that represent the specified style,
+		/// adding it to the list if it is not known.
+		/// </summary>
+		/// <exception cref="InvalidOperationException">The style is not listed and all flag bits are used.</exception>
+		internal StyleIndex GetOrSetStyleIndex(Style style) => this.GetOrSetStyleIndex(style, out _);
+		/// <summary>
+		/// Returns the <see cref="StyleIndex"/> flags that represent the specified style and a mask to remove conflicting styles,
+		/// adding it to the list if it is not known.
+		/// </summary>
+		/// <exception cref="InvalidOperationException">The style is not listed and all flag bits are used.</exception>
+		internal StyleIndex GetOrSetStyleIndex(Style style, out StyleIndex mask)
+		{
+			var styleIndex = GetStyleIndex(style, out mask);
+			if (styleIndex != 0) return styleIndex;
+
+			styleIndex = (StyleIndex) (1 << AddStyle(style));
+			mask = ~styleIndex;
+			return styleIndex;
+		}
+
+		public static SizeF GetCharSize(Font font, char c)
         {
             Size sz2 = TextRenderer.MeasureText("<" + c.ToString() + ">", font);
             Size sz3 = TextRenderer.MeasureText("<>", font);
@@ -4389,7 +4482,7 @@ namespace FastColoredTextBoxNS
             return true;
         }
 
-        #region AutoIndentChars
+#region AutoIndentChars
 
         /// <summary>
         /// Enables AutoIndentChars mode
@@ -4559,7 +4652,7 @@ namespace FastColoredTextBoxNS
             }
         }
 
-        #endregion
+#endregion
 
         private bool DoAutocompleteBrackets(char c)
         {
@@ -5379,21 +5472,23 @@ namespace FastColoredTextBoxNS
         {
             if (range.End > range.Start)
             {
-                int mask = 1;
                 bool hasTextStyle = false;
-                for (int i = 0; i < Styles.Length; i++)
-                {
-                    if (Styles[i] != null && ((int) styleIndex & mask) != 0)
-                    {
-                        Style style = Styles[i];
-                        bool isTextStyle = style is TextStyle;
-                        if (!hasTextStyle || !isTextStyle || AllowSeveralTextStyleDrawing)
-                            //cancelling secondary rendering by TextStyle
-                            style.Draw(gr, pos, range); //rendering
-                        hasTextStyle |= isTextStyle;
-                    }
-                    mask = mask << 1;
-                }
+
+				int bitIndex = 0;
+				for (int i = 0; i < Styles.Count; ++i) {
+					var mask = (StyleIndex) ((1 << Styles[i].Bits) - 1 << bitIndex);
+					if ((styleIndex & mask) != 0) {
+						var style = Styles[i].Styles[((uint) (styleIndex & mask) >> bitIndex) - 1];
+
+						bool isTextStyle = style is TextStyle;
+						if (!hasTextStyle || !isTextStyle || AllowSeveralTextStyleDrawing)
+							//cancelling secondary rendering by TextStyle
+							style.Draw(gr, pos, range); //rendering
+						hasTextStyle |= isTextStyle;
+					}
+					bitIndex += Styles[i].Bits;
+				}
+
                 //draw by default renderer
                 if (!hasTextStyle)
                     DefaultStyle.Draw(gr, pos, range);
@@ -5839,9 +5934,9 @@ namespace FastColoredTextBoxNS
         /// <returns>Line and char position</returns>
         public Place PointToPlace(Point point)
         {
-            #if debug
+#if debug
             var sw = Stopwatch.StartNew();
-            #endif
+#endif
             point.Offset(HorizontalScroll.Value, VerticalScroll.Value);
             point.Offset(-LeftIndent - Paddings.Left, 0);
             int iLine = YtoLineIndex(point.Y);
@@ -6011,7 +6106,7 @@ namespace FastColoredTextBoxNS
             //
 #if debug
             var sw = Stopwatch.StartNew();
-            #endif
+#endif
             CancelToolTip();
             ClearHints();
             IsChanged = true;
@@ -6075,7 +6170,7 @@ namespace FastColoredTextBoxNS
         {
 #if debug
             var sw = Stopwatch.StartNew();
-            #endif
+#endif
             //find folding markers for highlighting
             if (HighlightFoldingIndicator)
                 HighlightFoldings();
@@ -7190,9 +7285,9 @@ namespace FastColoredTextBoxNS
 
         public virtual void OnSyntaxHighlight(TextChangedEventArgs args)
         {
-            #if debug
+#if debug
             Stopwatch sw = Stopwatch.StartNew();
-            #endif
+#endif
 
             Range range;
 
@@ -7614,7 +7709,7 @@ window.status = ""#print"";
             ClearUndo();
         }
 
-        #region Drag and drop
+#region Drag and drop
 
         private bool IsDragDrop { get; set; }
 
@@ -7957,9 +8052,9 @@ window.status = ""#print"";
             base.OnDragLeave(e);
         }
 
-        #endregion
+#endregion
 
-        #region MiddleClickScrolling
+#region MiddleClickScrolling
 
         private bool middleClickScrollingActivated;
         private Point middleClickScrollingOriginPoint;
@@ -8153,10 +8248,10 @@ window.status = ""#print"";
             g.FillPolygon(brush, points);
         }
 
-        #endregion
+#endregion
 
 
-        #region Nested type: LineYComparer
+#region Nested type: LineYComparer
 
         private class LineYComparer : IComparer<LineInfo>
         {
@@ -8167,7 +8262,7 @@ window.status = ""#print"";
                 this.Y = Y;
             }
 
-            #region IComparer<LineInfo> Members
+#region IComparer<LineInfo> Members
 
             public int Compare(LineInfo x, LineInfo y)
             {
@@ -8177,10 +8272,10 @@ window.status = ""#print"";
                     return x.startY.CompareTo(Y);
             }
 
-            #endregion
+#endregion
         }
 
-        #endregion
+#endregion
     }
 
     public class PaintLineEventArgs : PaintEventArgs

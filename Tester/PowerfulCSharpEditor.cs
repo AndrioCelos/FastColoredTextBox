@@ -100,18 +100,14 @@ namespace Tester
         {
             //---block autocomplete menu for comments
             //get index of green style (used for comments)
-            var iGreenStyle = CurrentTB.GetStyleIndex(CurrentTB.SyntaxHighlighter.GreenStyle);
-            if (iGreenStyle >= 0)
-                if (CurrentTB.Selection.Start.iChar > 0)
-                {
-                    //current char (before caret)
-                    var c = CurrentTB[CurrentTB.Selection.Start.iLine][CurrentTB.Selection.Start.iChar - 1];
-                    //green Style
-                    var greenStyleIndex = Range.ToStyleIndex(iGreenStyle);
-                    //if char contains green style then block popup menu
-                    if ((c.style & greenStyleIndex) != 0)
-                        e.Cancel = true;
-                }
+            if (CurrentTB.Selection.Start.iChar > 0)
+            {
+                //current char (before caret)
+                var c = CurrentTB[CurrentTB.Selection.Start.iLine][CurrentTB.Selection.Start.iChar - 1];
+				//if char contains green style then block popup menu
+				if (CurrentTB.CharHasStyle(c, CurrentTB.SyntaxHighlighter.GreenStyle))
+                    e.Cancel = true;
+            }
         }
 
         private void BuildAutocompleteMenu(AutocompleteMenu popupMenu)

@@ -126,30 +126,27 @@ namespace FastColoredTextBoxNS
 
         private RTFStyleDescriptor GetRtfDescriptor(StyleIndex styleIndex)
         {
-            List<Style> styles = new List<Style>();
-            //find text renderer
-            TextStyle textStyle = null;
-            int mask = 1;
-            bool hasTextStyle = false;
-            for (int i = 0; i < tb.Styles.Length; i++)
-            {
-                if (tb.Styles[i] != null && ((int)styleIndex & mask) != 0)
-                    if (tb.Styles[i].IsExportable)
-                    {
-                        var style = tb.Styles[i];
-                        styles.Add(style);
+			List<Style> allStyles = tb.GetStylesOfStyleIndex(styleIndex);
+			List<Style> styles = new List<Style>();
+			//find text renderer
+			TextStyle textStyle = null;
+			bool hasTextStyle = false;
 
-                        bool isTextStyle = style is TextStyle;
-                        if (isTextStyle)
-                            if (!hasTextStyle || tb.AllowSeveralTextStyleDrawing)
-                            {
-                                hasTextStyle = true;
-                                textStyle = style as TextStyle;
-                            }
-                    }
-                mask = mask << 1;
-            }
-            //add TextStyle css
+			foreach (var style in allStyles) {
+				if (style.IsExportable) {
+					styles.Add(style);
+
+					bool isTextStyle = style is TextStyle;
+					if (isTextStyle)
+						if (!hasTextStyle || tb.AllowSeveralTextStyleDrawing) {
+							hasTextStyle = true;
+							textStyle = style as TextStyle;
+						}
+				}
+
+			}
+
+			//add TextStyle css
             RTFStyleDescriptor result = null;
 
             if (!hasTextStyle)

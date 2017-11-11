@@ -1615,7 +1615,16 @@
             the index of a free slot is returned. 
             </summary>
             <returns>Index of free styles buffer slot</returns>
-            <exception cref="T:System.Exception">If maximum count of styles is exceeded</exception>
+            <exception cref="T:System.InvalidOperationException">If maximum count of styles is exceeded</exception>
+        </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.CheckStylesBufferSize(System.Int32)">
+            <summary>
+            Checks if the styles buffer has the specified number of
+            bits remaining. If not, an exception is thrown. Otherwise, 
+            the index of a free slot is returned. 
+            </summary>
+            <returns>Index of free styles buffer slot</returns>
+            <exception cref="T:System.InvalidOperationException">If maximum count of styles is exceeded</exception>
         </member>
         <member name="M:FastColoredTextBoxNS.FastColoredTextBox.ShowFindDialog">
             <summary>
@@ -1737,7 +1746,23 @@
             Append string to end of the Text
             </summary>
         </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.GetStyleLayerIndex(FastColoredTextBoxNS.Style)">
+            <summary>
+            Returns index of the style in Styles
+            -1 otherwise
+            </summary>
+            <param name="style"></param>
+            <returns>Index of the style in Styles</returns>
+        </member>
         <member name="M:FastColoredTextBoxNS.FastColoredTextBox.GetStyleIndex(FastColoredTextBoxNS.Style)">
+            <summary>
+            Returns index of the style in Styles
+            -1 otherwise
+            </summary>
+            <param name="style"></param>
+            <returns>Index of the style in Styles</returns>
+        </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.GetStyleIndex(FastColoredTextBoxNS.Style,FastColoredTextBoxNS.StyleIndex@)">
             <summary>
             Returns index of the style in Styles
             -1 otherwise
@@ -1751,6 +1776,20 @@
             </summary>
             <param name="styles"></param>
             <returns>StyleIndex mask of given styles</returns>
+        </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.GetOrSetStyleIndex(FastColoredTextBoxNS.Style)">
+            <summary>
+            Returns the <see cref="T:FastColoredTextBoxNS.StyleIndex"/> flags that represent the specified style,
+            adding it to the list if it is not known.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">The style is not listed and all flag bits are used.</exception>
+        </member>
+        <member name="M:FastColoredTextBoxNS.FastColoredTextBox.GetOrSetStyleIndex(FastColoredTextBoxNS.Style,FastColoredTextBoxNS.StyleIndex@)">
+            <summary>
+            Returns the <see cref="T:FastColoredTextBoxNS.StyleIndex"/> flags that represent the specified style and a mask to remove conflicting styles,
+            adding it to the list if it is not known.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">The style is not listed and all flag bits are used.</exception>
         </member>
         <member name="M:FastColoredTextBoxNS.FastColoredTextBox.ClearSelected">
             <summary>
@@ -2886,6 +2925,13 @@
             <summary>
             Appends style to chars of range
             </summary>
+        </member>
+        <member name="M:FastColoredTextBoxNS.Range.SetStyle(FastColoredTextBoxNS.StyleIndex,FastColoredTextBoxNS.StyleIndex)">
+            <summary>
+            Appends style to chars of range
+            </summary>
+            <param name="styleIndex">The style flags to add.</param>
+            <param name="mask">A mask used to clear conflicting styles.</param>
         </member>
         <member name="M:FastColoredTextBoxNS.Range.SetFoldingMarkers(System.String,System.String)">
             <summary>

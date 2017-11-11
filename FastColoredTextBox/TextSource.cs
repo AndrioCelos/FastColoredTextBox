@@ -21,11 +21,11 @@ namespace FastColoredTextBoxNS
         /// <summary>
         /// Styles
         /// </summary>
-        public readonly Style[] Styles;
-        /// <summary>
-        /// Occurs when line was inserted/added
-        /// </summary>
-        public event EventHandler<LineInsertedEventArgs> LineInserted;
+        public readonly List<StyleGroup> Styles;
+		/// <summary>
+		/// Occurs when line was inserted/added
+		/// </summary>
+		public event EventHandler<LineInsertedEventArgs> LineInserted;
         /// <summary>
         /// Occurs when line was removed
         /// </summary>
@@ -92,12 +92,9 @@ namespace FastColoredTextBoxNS
             linesAccessor = new LinesAccessor(this);
             Manager = new CommandManager(this);
 
-            if (Enum.GetUnderlyingType(typeof(StyleIndex)) == typeof(UInt32))
-                Styles = new Style[32];
-            else
-                Styles = new Style[16];
+            Styles = new List<StyleGroup>(FastColoredTextBox.MaxStyles);
 
-            InitDefaultStyle();
+			InitDefaultStyle();
         }
 
         public virtual void InitDefaultStyle()
